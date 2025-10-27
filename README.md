@@ -25,6 +25,16 @@ This repository does not include resource files, so please download them from be
 
 Open *DiskInfo.sln* and build.
 
+### Portable bundle
+
+After building the desired configuration, you can create a portable ZIP archive by running the helper script:
+
+```
+powershell -ExecutionPolicy Bypass -File scripts/package-portable.ps1 -Configuration Release -Platform x64
+```
+
+The script copies the freshly built executable together with the language and resource folders into `dist/portable/<Platform>/<Configuration>` and generates `dist/CrystalDiskInfo-<Platform>-<Configuration>-portable.zip`. Use the optional `-ResourceOverride` parameter to point to the extracted *CdiResource* directory if you want those assets bundled as well.
+
 ### Note
 Copy *CdiResource* folder in the [Download CdiResource](https://crystalmark.info/redirect.php?product=CrystalDiskInfo) to *../Rugenia* folder created in the build. If the *CdiResource* folder does not exist at runtime, the app displays "*Not Found 'Graph.html'*".
 
