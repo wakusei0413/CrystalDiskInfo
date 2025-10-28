@@ -1,0 +1,83 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.24.3'
+      
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build Windows Release
+        run: flutter build windows --release
+      
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=0.0.1_ALPHA" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create portable package
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ZIP_NAME="project_cat_windows_portable_v${VERSION}.zip"
+          
+          # Navigate to the Release directory
+          cd build/windows/x64/runner/Release
+          
+          # Create zip file in the project root build directory
+          # From build/windows/x64/runner/Release, we need to go up 4 levels to build/
+          7z a "../../../../${ZIP_NAME}" *
+          
+          echo "Created ${ZIP_NAME}"
+      
+      - name: Verify package
+        shell: bash
+        run: |
+          echo "Checking if package was created..."
+          ls -lh build/
+          
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          ZIP_NAME="project_cat_windows_portable_v${VERSION}.zip"
+          
+          if [ -f "build/${ZIP_NAME}" ]; then
+            echo "✓ Package found: ${ZIP_NAME}"
+            echo "Size: $(du -h build/${ZIP_NAME} | cut -f1)"
+          else
+            echo "✗ Package not found: ${ZIP_NAME}"
+            exit 1
+          fi
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: build/project_cat_windows_portable_v${{ steps.version.outputs.VERSION }}.zip
+      
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/project_cat_windows_portable_v${{ steps.version.outputs.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
