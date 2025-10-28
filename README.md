@@ -23,17 +23,42 @@ This repository does not include resource files, so please download them from be
 
 ## Building
 
+### Quick Start (Windows)
+
+For automated building on Windows:
+```batch
+scripts\build-local.bat
+```
+
+This will build both Win32 and x64 Release versions and create portable packages.
+
+### Manual Build
+
 Open *DiskInfo.sln* and build.
 
 ### Portable bundle
 
 After building the desired configuration, you can create a portable ZIP archive by running the helper script:
 
-```
+```powershell
+# For x64
 powershell -ExecutionPolicy Bypass -File scripts/package-portable.ps1 -Configuration Release -Platform x64
+
+# For Win32
+powershell -ExecutionPolicy Bypass -File scripts/package-portable.ps1 -Configuration Release -Platform Win32
 ```
 
 The script copies the freshly built executable together with the language and resource folders into `dist/portable/<Platform>/<Configuration>` and generates `dist/CrystalDiskInfo-<Platform>-<Configuration>-portable.zip`. Use the optional `-ResourceOverride` parameter to point to the extracted *CdiResource* directory if you want those assets bundled as well.
+
+### Automated Release (CI/CD)
+
+This repository includes a GitHub Actions workflow for automated building and releasing:
+
+- **Automatic**: Push a version tag (e.g., `v9.0.0-RC2`) to trigger a release
+- **Manual**: Use GitHub Actions web UI to manually trigger a release
+- **CLI**: Run `./scripts/trigger-release.sh <version>` (requires GitHub CLI)
+
+See [BUILD_RELEASE.md](BUILD_RELEASE.md) for detailed instructions.
 
 ### Note
 Copy *CdiResource* folder in the [Download CdiResource](https://crystalmark.info/redirect.php?product=CrystalDiskInfo) to *../Rugenia* folder created in the build. If the *CdiResource* folder does not exist at runtime, the app displays "*Not Found 'Graph.html'*".

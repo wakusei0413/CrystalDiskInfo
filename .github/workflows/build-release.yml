@@ -1,0 +1,136 @@
+name: Build and Release Windows Portable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 9.0.0-RC2)'
+        required: true
+        default: '9.0.0-RC2'
+
+jobs:
+  build:
+    name: Build Windows Portable
+    runs-on: windows-2019
+    strategy:
+      matrix:
+        platform: [Win32, x64]
+        configuration: [Release]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+        with:
+          vs-version: '[16.0,17.0)'
+      
+      - name: Restore NuGet packages
+        run: nuget restore DiskInfo.sln
+      
+      - name: Build solution
+        run: |
+          msbuild DiskInfo.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /m /v:minimal
+      
+      - name: List build output
+        shell: powershell
+        run: |
+          Write-Host "Looking for build output..."
+          Get-ChildItem -Path ..\ -Recurse -Filter DiskInfo*.exe | Select-Object FullName
+      
+      - name: Package portable version
+        shell: powershell
+        run: |
+          .\scripts\package-portable.ps1 -Configuration ${{ matrix.configuration }} -Platform ${{ matrix.platform }}
+      
+      - name: Upload portable package
+        uses: actions/upload-artifact@v3
+        with:
+          name: CrystalDiskInfo-${{ matrix.platform }}-${{ matrix.configuration }}-portable
+          path: dist/CrystalDiskInfo-${{ matrix.platform }}-${{ matrix.configuration }}-portable.zip
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find ./artifacts -name "*.zip" -exec cp {} ./release/ \;
+          ls -lh ./release/
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## CrystalDiskInfo Windows 10 1803+ Portable Release
+          
+          ### Support Information
+          - ✅ Windows 10 Version 1803 (April 2018 Update) and later
+          - ✅ Windows 11
+          
+          ### Included Platforms
+          - **x86 (Win32)**: For 32-bit Windows systems
+          - **x64**: For 64-bit Windows systems
+          
+          ### Installation
+          1. Download the appropriate ZIP file for your system architecture
+          2. Extract all files to a folder of your choice
+          3. Run `DiskInfo32.exe` (Win32) or `DiskInfo64.exe` (x64)
+          4. No installation required - fully portable!
+          
+          ### Features
+          - Monitor HDD/SSD health status
+          - Display S.M.A.R.T. information
+          - Temperature monitoring and alerts
+          - Support for various drive types (PATA, SATA, USB, NVMe)
+          - Multi-language support
+          
+          ### Notes
+          - Administrator privileges recommended for full functionality
+          - For complete theme and language support, download CdiResource from the official website
+          
+          ---
+          Built with ❤️ for Windows 10 1803+
+          EOF
+          echo "Release notes generated"
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          name: CrystalDiskInfo ${{ steps.version.outputs.version }} - Windows 10 1803+ Portable
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

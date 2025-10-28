@@ -48,8 +48,22 @@ if (-not $OutputRoot) {
     $OutputRoot = Join-Path -Path $repoRoot -ChildPath 'dist'
 }
 
-$exeName = 'DiskInfo.exe'
+$exeNameMap = @{
+    'Win32' = 'DiskInfo32.exe'
+    'x64' = 'DiskInfo64.exe'
+    'ARM' = 'DiskInfoA32.exe'
+    'ARM64' = 'DiskInfoA64.exe'
+}
+
+$exeName = if ($exeNameMap.ContainsKey($Platform)) {
+    $exeNameMap[$Platform]
+} else {
+    'DiskInfo.exe'
+}
+
+$rugeniaPath = [System.IO.Path]::Combine((Split-Path -Parent $repoRoot), 'Rugenia')
 $probableOutputs = @(
+    [System.IO.Path]::Combine($rugeniaPath, $exeName),
     [System.IO.Path]::Combine($repoRoot, $Platform, $Configuration, $exeName),
     [System.IO.Path]::Combine($repoRoot, $Configuration, $exeName),
     [System.IO.Path]::Combine($repoRoot, 'Win32', $Configuration, $exeName),
